@@ -881,6 +881,7 @@ function showTab(name){ applyMobileAfterRender();
 const COST_LABOR_HRS_PER_SQFT = 0.0295;
 const COST_LABOR_RATE = 25;
 const COST_OVERHEAD = 60;
+const COST_WASTE = 33;
 const COST_ANCHOR_A_PER_SQFT = 445 / 5000;
 const COST_ANCHOR_B_PER_SQFT = 445 / 2500;
 const COST_TC_PER_SQFT = 1200 / 1500;
@@ -940,8 +941,8 @@ function calcJobCostCustom(job, laborRate, overhead, crewSize) {
     const tcCost = tcPairs * 1200;
     matCost = (COST_ANCHOR_A_PER_SQFT + COST_ANCHOR_B_PER_SQFT) * sqft + tcCost + chipRate * sqft;
   }
-  const total = laborCost + matCost + overhead;
-  return { labor: laborCost, materials: matCost, overhead, total, costPerSqft: total / sqft };
+  const total = laborCost + matCost + overhead + COST_WASTE;
+  return { labor: laborCost, materials: matCost, overhead, waste: COST_WASTE, total, costPerSqft: total / sqft };
 }
 
 function onEstJobTypeChange() {
@@ -979,42 +980,62 @@ function runEstimator() {
         <div class="result-meta">${chipColor} &middot; ${chipSeries} series</div>
       </div>
     </div>
-    <div class="result-grid" style="margin-bottom:10px;">
-      <div class="result-item">
-        <div class="result-item-label">Labor</div>
-        <div class="result-item-val">$${c.labor.toFixed(0)}</div>
-        <div class="hint">${totalHrs} total hrs &middot; ${crewSize} workers &middot; $${laborRate}/hr</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="result-item">
+          <div class="result-item-label">Labor</div>
+          <div class="result-item-val">$${c.labor.toFixed(0)}</div>
+          <div class="hint">${totalHrs} hrs &middot; ${crewSize} workers &middot; $${laborRate}/hr</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">Materials</div>
+          <div class="result-item-val">$${c.materials.toFixed(0)}</div>
+          <div class="hint">$${(c.materials/sqft).toFixed(2)}/sqft</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">Waste</div>
+          <div class="result-item-val">$${COST_WASTE}</div>
+          <div class="hint">Flat per job</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">Overhead</div>
+          <div class="result-item-val">$${overhead}</div>
+          <div class="hint">Consumables, fuel, etc.</div>
+        </div>
       </div>
       <div class="result-item">
-        <div class="result-item-label">Materials</div>
-        <div class="result-item-val">$${c.materials.toFixed(0)}</div>
-        <div class="hint">$${(c.materials/sqft).toFixed(2)}/sqft</div>
-      </div>
-      <div class="result-item">
-        <div class="result-item-label">Overhead</div>
-        <div class="result-item-val">$${overhead}</div>
-        <div class="hint">Consumables, fuel, etc.</div>
-      </div>
-      <div class="result-item" style="grid-column:span 3;">
-        <div class="result-item-label">Total job cost</div>
-        <div class="result-item-val" style="color:var(--gf-warn);font-size:20px;">$${c.total.toFixed(0)}</div>
-        <div class="hint">$${c.costPerSqft.toFixed(2)}/sqft</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <div class="result-item-label">Total job cost</div>
+            <div class="result-item-val" style="color:var(--gf-warn);font-size:20px;">$${c.total.toFixed(0)}</div>
+          </div>
+          <div>
+            <div class="result-item-label">Cost per sqft</div>
+            <div class="result-item-val" style="color:var(--gf-warn);font-size:20px;">$${c.costPerSqft.toFixed(2)}</div>
+          </div>
+        </div>
       </div>
     </div>
     ${hasSale ? `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;" class="est-margin-grid">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
       <div class="result-item">
         <div class="result-item-label">Sale price</div>
         <div class="result-item-val">$${salePrice.toLocaleString()}</div>
+        <div class="hint">$${(salePrice/sqft).toFixed(2)}/sqft</div>
       </div>
       <div class="result-item">
         <div class="result-item-label">Gross profit</div>
         <div class="result-item-val" style="color:${marginColor};">$${margin.toFixed(0)}</div>
+        <div class="hint">$${(margin/sqft).toFixed(2)}/sqft</div>
       </div>
       <div class="result-item">
         <div class="result-item-label">Margin</div>
         <div class="result-item-val" style="color:${marginColor};">${marginPct.toFixed(1)}%</div>
         <div class="hint">${isHealthy ? "Healthy" : isFloor ? "Below floor" : "Tight"}</div>
+      </div>
+      <div class="result-item">
+        <div class="result-item-label">Profit/sqft</div>
+        <div class="result-item-val" style="color:${marginColor};">$${(margin/sqft).toFixed(2)}</div>
       </div>
     </div>` : ""}
   </div>`;

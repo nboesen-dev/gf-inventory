@@ -302,24 +302,24 @@ select option { background: var(--gf-card2); }
 
   <div id="tab-cost" style="display:none;">
     <div class="job-form">
-      <div class="form-row">
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;">
         <div class="form-group">
           <label>Square footage</label>
-          <input type="number" id="est-sqft" placeholder="e.g. 650" min="1" oninput="runEstimator()" />
+          <input type="number" id="est-sqft" placeholder="e.g. 650" min="1" oninput="runEstimator()" style="width:100%;" />
         </div>
         <div class="form-group">
           <label>Job type</label>
-          <select id="est-jobtype" onchange="onEstJobTypeChange()">
+          <select id="est-jobtype" onchange="onEstJobTypeChange()" style="width:100%;">
             <option value="standard">Standard (indoor)</option>
             <option value="outdoor">Outdoor / UV</option>
             <option value="double">Double broadcast</option>
           </select>
         </div>
       </div>
-      <div class="form-row est-chip-row" id="est-chip-row">
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;" id="est-chip-row">
         <div class="form-group">
           <label>Chip color</label>
-          <select id="est-chip" onchange="runEstimator()">
+          <select id="est-chip" onchange="runEstimator()" style="width:100%;">
             <option value="">-- select chip --</option>
             <optgroup label="Standard series">
               <option>Autumn</option><option>Birch Bark</option><option>Blue Blend</option>
@@ -350,13 +350,13 @@ select option { background: var(--gf-card2); }
         </div>
         <div class="form-group">
           <label>Sale price <span style="color:var(--gf-muted);font-weight:400;">(optional)</span></label>
-          <input type="number" id="est-sale" placeholder="Enter to see margin" oninput="runEstimator()" />
+          <input type="number" id="est-sale" placeholder="Enter to see margin" oninput="runEstimator()" style="width:100%;" />
         </div>
       </div>
-      <div class="form-row">
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;">
         <div class="form-group">
           <label>Labor rate ($/hr) <span style="color:var(--gf-muted);font-weight:400;">default $25</span></label>
-          <div class="labor-crew-row">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <input type="number" id="est-labor-rate" value="25" min="0" oninput="runEstimator()" />
             <select id="est-crew" onchange="runEstimator()">
               <option value="2">2 workers</option>
@@ -366,7 +366,7 @@ select option { background: var(--gf-card2); }
         </div>
         <div class="form-group">
           <label>Overhead ($) <span style="color:var(--gf-muted);font-weight:400;">default $60</span></label>
-          <input type="number" id="est-overhead" value="60" min="0" oninput="runEstimator()" />
+          <input type="number" id="est-overhead" value="60" min="0" oninput="runEstimator()" style="width:100%;" />
         </div>
       </div>
       <div id="est-outdoor-note" style="display:none;" class="alert info">Top coat used as anchor coat — no Anchor A or B consumed.</div>
@@ -376,6 +376,7 @@ select option { background: var(--gf-card2); }
 </div>
 
 <script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzPoipXihYY6jQEjB1mNidG1S7CArjUCfQkeRQUV3L60QROfwyd8E-erppxr5btU5E8CQ/exec";
 const TOPCOAT_SQFT_PER_PAIR=1500,ANCHOR_A_SQFT=5000,ANCHOR_B_SQFT=2500,CHIP_BUFFER=30,OUTDOOR_ANCHOR_SQFT_PER_BUCKET=1733,FREE_SHIP=3000,FREE_LIFTGATE=5000;
 const PRICES={"Anchor Coat A":445,"Anchor Coat B - Grey":445,"Anchor Coat B - Tan":445,"Anchor Coat B - Clear":445,"Top Coat A":600,"Top Coat B":600};
 const MIN_BACKSTOCK={"Anchor Coat A":0,"Anchor Coat B - Grey":1,"Anchor Coat B - Tan":1,"Anchor Coat B - Clear":0,"Top Coat A":0,"Top Coat B":0};
@@ -428,9 +429,9 @@ function setSyncStatus(state,text){const el=document.getElementById("sync-status
 
 function loadData(){
   setSyncStatus("syncing","Loading...");
-  google.script.run
-    .withSuccessHandler(function(r){
-      const d=JSON.parse(r);
+  fetch(GAS_URL + "?action=getInventory")
+    .then(r => r.json())
+    .then(d => {
       inventory.coatings=d.coatings;inventory.chips=d.chips;jobs=d.jobs;
       setSyncStatus("ok","Synced");
       document.getElementById("planner-loading").style.display="none";
@@ -439,8 +440,7 @@ function loadData(){
       if(document.getElementById("tab-inventory").style.display!=="none")renderInventoryTables();
       if(document.getElementById("tab-order").style.display!=="none")renderOrderGuide();
     })
-    .withFailureHandler(function(e){setSyncStatus("error","Load failed");console.error(e);})
-    .getInventory();
+    .catch(e => {setSyncStatus("error","Load failed");console.error(e);});
 }
 
 function jobMaterials(job){
@@ -572,10 +572,13 @@ function clearJobs(){if(!jobs.length)return;if(!confirm("Clear all jobs?"))retur
 
 function persistJobs(){
   setSyncStatus("syncing","Saving...");
-  google.script.run
-    .withSuccessHandler(()=>setSyncStatus("ok","Saved"))
-    .withFailureHandler(()=>setSyncStatus("error","Save failed"))
-    .saveJobs(JSON.stringify(jobs));
+  fetch(GAS_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveJobs", jobs: jobs })
+  })
+    .then(r => r.json())
+    .then(() => setSyncStatus("ok","Saved"))
+    .catch(() => setSyncStatus("error","Save failed"));
 }
 
 function formatDate(d){
@@ -788,7 +791,10 @@ function updateCoating(name,val){
   renderJobs();
   if(document.getElementById("tab-order").style.display!=="none")renderOrderGuide();
   setSyncStatus("syncing","Saving...");
-  google.script.run.withSuccessHandler(()=>setSyncStatus("ok","Saved")).withFailureHandler(()=>setSyncStatus("error","Save failed")).updateCoating(name,v);
+  fetch(GAS_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "updateCoating", name: name, qty: v })
+  }).then(r => r.json()).then(() => setSyncStatus("ok","Saved")).catch(() => setSyncStatus("error","Save failed"));
 }
 
 function updateChip(name,val){
@@ -796,7 +802,10 @@ function updateChip(name,val){
   const c=inventory.chips.find(x=>x.name===name);if(c)c.qty=v;
   renderJobs();
   setSyncStatus("syncing","Saving...");
-  google.script.run.withSuccessHandler(()=>setSyncStatus("ok","Saved")).withFailureHandler(()=>setSyncStatus("error","Save failed")).updateChip(name,v);
+  fetch(GAS_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "updateChip", name: name, qty: v })
+  }).then(r => r.json()).then(() => setSyncStatus("ok","Saved")).catch(() => setSyncStatus("error","Save failed"));
 }
 
 function renderOrderGuide(){

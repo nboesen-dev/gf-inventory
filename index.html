@@ -365,8 +365,8 @@ select option { background: var(--gf-card2); }
           </div>
         </div>
         <div class="form-group">
-          <label>Overhead ($) <span style="color:var(--gf-muted);font-weight:400;">default $60</span></label>
-          <input type="number" id="est-overhead" value="60" min="0" oninput="runEstimator()" style="width:100%;" />
+          <label>Overhead ($) <span style="color:var(--gf-muted);font-weight:400;">default $100</span></label>
+          <input type="number" id="est-overhead" value="100" min="0" oninput="runEstimator()" style="width:100%;" />
         </div>
       </div>
       <div id="est-outdoor-note" style="display:none;" class="alert info">Top coat used as anchor coat — no Anchor A or B consumed.</div>
@@ -1020,18 +1020,19 @@ function runEstimator() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
       <div class="result-item">
         <div class="result-item-label">Sale price</div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-          <div class="result-item-val">$${salePrice.toLocaleString()}</div>
-          <div style="font-size:13px;color:var(--gf-muted);">$${(salePrice/sqft).toFixed(2)}/sqft</div>
-        </div>
+        <div class="result-item-val">$${salePrice.toLocaleString()}</div>
+      </div>
+      <div class="result-item">
+        <div class="result-item-label">Price per sqft</div>
+        <div class="result-item-val">$${(salePrice/sqft).toFixed(2)}</div>
       </div>
       <div class="result-item">
         <div class="result-item-label">Gross profit</div>
         <div class="result-item-val" style="color:${marginColor};">$${margin.toFixed(0)}</div>
       </div>
-      <div class="result-item" style="grid-column:span 2;">
+      <div class="result-item">
         <div class="result-item-label">Margin</div>
-        <div class="result-item-val" style="color:${marginColor};">${marginPct.toFixed(1)}% &nbsp;<span style="font-size:13px;font-weight:400;">${isHealthy ? "✓ Healthy" : isFloor ? "✗ Below floor" : "⚠ Tight"}</span></div>
+        <div class="result-item-val" style="color:${marginColor};">${marginPct.toFixed(1)}% <span style="font-size:12px;font-weight:400;">${isHealthy ? "✓ Healthy" : isFloor ? "✗ Below floor" : "⚠ Tight"}</span></div>
       </div>
     </div>` : ""}
   </div>`;

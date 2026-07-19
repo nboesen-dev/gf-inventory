@@ -1020,22 +1020,18 @@ function runEstimator() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
       <div class="result-item">
         <div class="result-item-label">Sale price</div>
-        <div class="result-item-val">$${salePrice.toLocaleString()}</div>
-        <div class="hint">$${(salePrice/sqft).toFixed(2)}/sqft</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <div class="result-item-val">$${salePrice.toLocaleString()}</div>
+          <div style="font-size:13px;color:var(--gf-muted);">$${(salePrice/sqft).toFixed(2)}/sqft</div>
+        </div>
       </div>
       <div class="result-item">
         <div class="result-item-label">Gross profit</div>
         <div class="result-item-val" style="color:${marginColor};">$${margin.toFixed(0)}</div>
-        <div class="hint">$${(margin/sqft).toFixed(2)}/sqft</div>
       </div>
-      <div class="result-item">
+      <div class="result-item" style="grid-column:span 2;">
         <div class="result-item-label">Margin</div>
-        <div class="result-item-val" style="color:${marginColor};">${marginPct.toFixed(1)}%</div>
-        <div class="hint">${isHealthy ? "Healthy" : isFloor ? "Below floor" : "Tight"}</div>
-      </div>
-      <div class="result-item">
-        <div class="result-item-label">Profit/sqft</div>
-        <div class="result-item-val" style="color:${marginColor};">$${(margin/sqft).toFixed(2)}</div>
+        <div class="result-item-val" style="color:${marginColor};">${marginPct.toFixed(1)}% &nbsp;<span style="font-size:13px;font-weight:400;">${isHealthy ? "✓ Healthy" : isFloor ? "✗ Below floor" : "⚠ Tight"}</span></div>
       </div>
     </div>` : ""}
   </div>`;

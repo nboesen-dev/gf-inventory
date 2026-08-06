@@ -342,9 +342,12 @@ select option { background: var(--gf-card2); }
               <option>Pumice</option><option>Schist</option>
             </optgroup>
             <optgroup label="Stonebridge series">
-              <option>Agate</option><option>Baskerville</option><option>Bethpage</option>
-              <option>Copperplate</option><option>Phoenix</option><option>Pinehurst</option>
+              <option>Baskerville</option><option>Bethpage</option>
+              <option>Copperplate</option><option>Pinehurst</option>
               <option>Port Rush</option><option>Troon</option>
+            </optgroup>
+            <optgroup label="Hybrid series">
+              <option>Agate</option><option>Blue Granite</option><option>Denali</option><option>Limestone</option><option>Phoenix</option><option>Santa Fe</option>
             </optgroup>
           </select>
         </div>
@@ -411,12 +414,13 @@ const CHIP_MASTER={
   "Terrazzo":{options:["Anchor Coat B - Grey|","Anchor Coat B - Tan|"]},"Tidal Wave":{anchorB:"Anchor Coat B - Grey",tint:null},
   "Troon":{anchorB:"Anchor Coat B - Grey",tint:null},"Victorian":{anchorB:"Anchor Coat B - Grey",tint:null},
   "Willow":{anchorB:"Anchor Coat B - Clear",tint:"Mocha"},"Wombat":{anchorB:"Anchor Coat B - Grey",tint:null},
-  "Woodland":{anchorB:"Anchor Coat B - Tan",tint:null},"Zen Green":{anchorB:"Anchor Coat B - Grey",tint:null}
+  "Woodland":{anchorB:"Anchor Coat B - Tan",tint:null},"Zen Green":{anchorB:"Anchor Coat B - Grey",tint:null},"Blue Granite":{anchorB:"Anchor Coat B - Grey",tint:null},"Denali":{anchorB:"Anchor Coat B - Grey",tint:null},"Limestone":{options:["Anchor Coat B - Grey|","Anchor Coat B - Tan|"]},"Santa Fe":{anchorB:"Anchor Coat B - Tan",tint:null}
 };
 
 const STONE=["Basalt","Carbon","Dolerite","Feldspar","Garnet","Obsidian","Pumice","Schist"];
-const BRIDGE=["Agate","Baskerville","Bethpage","Copperplate","Phoenix","Pinehurst","Port Rush","Troon"];
-function getSeries(n){if(STONE.includes(n))return"Stone";if(BRIDGE.includes(n))return"Stonebridge";return"Standard";}
+const BRIDGE=["Baskerville","Bethpage","Copperplate","Pinehurst","Port Rush","Troon"];
+const HYBRID=["Agate","Blue Granite","Denali","Limestone","Phoenix","Santa Fe"];
+function getSeries(n){if(STONE.includes(n))return"Stone";if(BRIDGE.includes(n))return"Stonebridge";if(HYBRID.includes(n))return"Hybrid";return"Standard";}
 
 let inventory={coatings:[],chips:[]},jobs=[];
 
@@ -888,10 +892,11 @@ const COST_TC_PER_SQFT = 1200 / 1500;
 const COST_CHIP_STD_PER_SQFT = 94 / 465;
 const COST_CHIP_BRIDGE_PER_SQFT = 124 / 465;
 const STONE_SERIES = ["Basalt","Carbon","Dolerite","Feldspar","Garnet","Obsidian","Pumice","Schist"];
-const STONEBRIDGE_SERIES = ["Agate","Baskerville","Bethpage","Copperplate","Phoenix","Pinehurst","Port Rush","Troon"];
+const STONEBRIDGE_SERIES = ["Baskerville","Bethpage","Copperplate","Pinehurst","Port Rush","Troon"];
+const HYBRID_SERIES = ["Agate","Blue Granite","Denali","Limestone","Phoenix","Santa Fe"];
 
 function getChipCostPerSqft(chipColor) {
-  if (STONEBRIDGE_SERIES.includes(chipColor)) return COST_CHIP_BRIDGE_PER_SQFT;
+  if (STONEBRIDGE_SERIES.includes(chipColor) || HYBRID_SERIES.includes(chipColor)) return COST_CHIP_BRIDGE_PER_SQFT;
   return COST_CHIP_STD_PER_SQFT;
 }
 

@@ -152,7 +152,7 @@ function getInventory() {
       anchorBSku: r[4] || null,
       tint: r[5] || null,
       chipOverride: r[6] ? parseInt(r[6], 10) : null,
-      installDate: r[7] || ''
+      installDate: normalizeDate_(r[7])
     };
   });
 
@@ -206,8 +206,8 @@ function validateJob_(job) {
     throw new Error('Invalid job type');
   }
 
-  const installDate = String(job.installDate || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(installDate)) throw new Error('Invalid install date');
+  const installDate = normalizeDate_(job.installDate);
+  if (!installDate) throw new Error('Invalid install date');
 
   let chipOverride = '';
   if (job.chipOverride !== null && job.chipOverride !== undefined && job.chipOverride !== '') {
@@ -230,6 +230,15 @@ function requiredSheet_(ss, name) {
   const sheet = ss.getSheetByName(name);
   if (!sheet) throw new Error('Missing sheet: ' + name);
   return sheet;
+}
+
+function normalizeDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const text = String(value || '');
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
 }
 
 function finiteNumber_(value, fallback) {

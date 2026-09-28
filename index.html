@@ -496,9 +496,15 @@ function jobMaterials(job){
   return{aA,aB,tc,ch};
 }
 
-function projectedRemaining(sku){
+function orderWindowJobs(){
+  const today=new Date();
+  const start=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  const end=new Date(start);end.setDate(end.getDate()+45);
+  return jobs.filter(j=>{const d=new Date(j.installDate+"T12:00:00");return d>=start&&d<=end;});
+}
+function projectedRemaining(sku,selectedJobs=orderWindowJobs()){
   let used=0;
-  jobs.forEach(job=>{
+  selectedJobs.forEach(job=>{
     const m=jobMaterials(job);
     if(sku==="Anchor Coat A")used+=m.aA;
     else if(sku===job.anchorBSku)used+=m.aB;
@@ -506,7 +512,7 @@ function projectedRemaining(sku){
   });
   return getCoatingQty(sku)-used;
 }
-function projectedTC(){return Math.min(projectedRemaining("Top Coat A"),projectedRemaining("Top Coat B"));}
+function projectedTC(selectedJobs=orderWindowJobs()){return Math.min(projectedRemaining("Top Coat A",selectedJobs),projectedRemaining("Top Coat B",selectedJobs));}
 
 function updateChipSuggestion(){
   const s=parseFloat(document.getElementById("sqft").value),jt=document.getElementById("job-type").value;
@@ -760,7 +766,9 @@ function renderJobs(){
   const el=document.getElementById("job-list"),ce=document.getElementById("combined-needs");
   if(!jobs.length){el.innerHTML='<p style="color:var(--gf-muted);font-size:13px;padding:0.5rem 0;">No jobs yet. Add one above.</p>';ce.innerHTML="";return;}
   let html="";
+  const upcoming=orderWindowJobs();
   jobs.forEach((job,i)=>{
+    const inWindow=upcoming.includes(job);
     const m=jobMaterials(job);
     const chHave=getChipQty(job.chipColor),chShort=Math.max(0,m.ch-chHave);
     const abLabel=job.anchorBSku?(job.anchorBSku.replace("Anchor Coat B - ","")+(job.tint?" + "+job.tint:"")):"—";
@@ -771,19 +779,19 @@ function renderJobs(){
     const aAok=aArem>=(MIN_BACKSTOCK["Anchor Coat A"]||0);
     const aBok=aBrem===null||aBrem>=(MIN_BACKSTOCK[job.anchorBSku]||0);
     const tcOk=tcRem>=1;
-    const hasIssues=!aAok||!aBok||!tcOk||chShort>0;
+    const hasIssues=inWindow&&(!aAok||!aBok||!tcOk||chShort>0);
     const overrideNote=job.chipOverride?` <span style="color:var(--gf-muted);font-size:11px;">(manual)</span>`:"";
     const aAItem=job.jobType==="outdoor"
       ?'<div class="result-item na-item"><div class="result-item-label">Anchor A</div><div>Not used</div></div>'
-      :`<div class="result-item"><div class="result-item-label">Anchor A</div><div class="result-item-val">${(job.sqft/ANCHOR_A_SQFT).toFixed(2)} buckets</div><div style="margin-top:5px;">${sb(aArem,MIN_BACKSTOCK["Anchor Coat A"]||0,"danger")} <span class="hint">${aArem.toFixed(2)} left after all jobs</span></div></div>`;
+      :`<div class="result-item"><div class="result-item-label">Anchor A</div><div class="result-item-val">${(job.sqft/ANCHOR_A_SQFT).toFixed(2)} buckets</div><div style="margin-top:5px;">${inWindow?`${sb(aArem,MIN_BACKSTOCK["Anchor Coat A"]||0,"danger")} <span class="hint">${aArem.toFixed(2)} left after window jobs</span>`:'<span class="hint">Outside order window</span>'}</div></div>`;
     const aBItem=job.jobType==="outdoor"
       ?'<div class="result-item na-item"><div class="result-item-label">Anchor B</div><div>Not used</div></div>'
-      :`<div class="result-item"><div class="result-item-label">Anchor B &mdash; ${abLabel}</div><div class="result-item-val">${(job.sqft/ANCHOR_B_SQFT).toFixed(2)} buckets</div><div style="margin-top:5px;">${sb(aBrem!==null?aBrem:99,MIN_BACKSTOCK[job.anchorBSku]||0)} <span class="hint">${aBrem!==null?aBrem.toFixed(2):"—"} left after all jobs</span></div>${tintNote}</div>`;
+      :`<div class="result-item"><div class="result-item-label">Anchor B &mdash; ${abLabel}</div><div class="result-item-val">${(job.sqft/ANCHOR_B_SQFT).toFixed(2)} buckets</div><div style="margin-top:5px;">${inWindow?`${sb(aBrem!==null?aBrem:99,MIN_BACKSTOCK[job.anchorBSku]||0)} <span class="hint">${aBrem!==null?aBrem.toFixed(2):"—"} left after window jobs</span>`:'<span class="hint">Outside order window</span>'}</div>${tintNote}</div>`;
     const tcLabel=job.jobType==="outdoor"?"Top coat (anchor + finish)":job.jobType==="double"?"Top coat pairs (×2)":"Top coat pairs";
     html+=`<div class="result-card ${hasIssues?"has-issues":"all-good"}" id="job-card-${i}">
       <div class="result-header">
         <div>
-          <div class="result-date">${formatDate(job.installDate)}</div>
+          <div class="result-date">${formatDate(job.installDate)}${inWindow?"":' · Outside 45-day order window'}</div>
           <div class="result-name">${job.name} ${jtBadge(job.jobType)}</div>
           <div class="result-meta">${job.sqft.toLocaleString()} sq ft &middot; ${job.chipColor}${job.jobType!=="outdoor"?" &middot; Anchor B - "+abLabel:""}</div>
         </div>
@@ -794,22 +802,21 @@ function renderJobs(){
         <div class="result-item">
           <div class="result-item-label">${tcLabel}</div>
           <div class="result-item-val">${m.tc.toFixed(2)} pairs</div>
-          <div style="margin-top:5px;">${tcOk?'<span class="badge ok">Covered</span>':"<span class=\"badge danger\">Order now</span>"} <span class="hint">${tcRem.toFixed(2)} left after all jobs</span></div>
+          <div style="margin-top:5px;">${inWindow?`${tcOk?'<span class="badge ok">Covered</span>':"<span class=\"badge danger\">Order now</span>"} <span class="hint">${tcRem.toFixed(2)} left after window jobs</span>`:'<span class="hint">Outside order window</span>'}</div>
         </div>
         <div class="result-item" style="grid-column:span 3;">
           <div class="result-item-label">Chips &mdash; ${job.chipColor}${job.jobType==="double"?" (double broadcast)":""}</div>
           <div class="result-item-val">${m.ch} boxes needed${overrideNote}</div>
           <div style="margin-top:5px;display:flex;align-items:center;gap:6px;">
-            ${sb(chHave,m.ch)}
-            <span class="hint">${chHave===0?"Not in stock &mdash; order "+m.ch+" boxes":"have "+chHave+(chShort>0?" &mdash; order "+chShort+" more":"")}</span>
+            ${inWindow?`${sb(chHave,m.ch)} <span class="hint">${chHave===0?"Not in stock &mdash; order "+m.ch+" boxes":"have "+chHave+(chShort>0?" &mdash; order "+chShort+" more":"")}</span>`:'<span class="hint">Outside order window</span>'}
           </div>
         </div>
       </div>
     </div>`;
   });
   el.innerHTML=html;
-  if(jobs.length>1){
-    const usedSkus=new Set(["Anchor Coat A",...jobs.filter(j=>j.anchorBSku).map(j=>j.anchorBSku)]);
+  if(upcoming.length){
+    const usedSkus=new Set(["Anchor Coat A",...upcoming.filter(j=>j.anchorBSku).map(j=>j.anchorBSku)]);
     let alerts="";
     ["Anchor Coat A","Anchor Coat B - Grey","Anchor Coat B - Tan","Anchor Coat B - Clear"].filter(s=>usedSkus.has(s)).forEach(sku=>{
       const rem=projectedRemaining(sku),min=MIN_BACKSTOCK[sku]||0,ok=rem>=min;
@@ -818,13 +825,13 @@ function renderJobs(){
     const tcRem=projectedTC();
     alerts+=`<div class="alert ${tcRem>=1?"ok":"danger"}">Top coat pairs: ${tcRem.toFixed(2)} remaining &mdash; ${tcRem>=1?"backstock OK":"order now"}</div>`;
     const chipTotals={};
-    jobs.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
+    upcoming.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
     Object.entries(chipTotals).forEach(([color,need])=>{
       const have=getChipQty(color),short=Math.max(0,need-have);
       alerts+=`<div class="alert ${short>0?"danger":"ok"}">${color} chips: need ${need}, have ${have} &mdash; ${short>0?"order "+short+" more":"covered"}</div>`;
     });
-    ce.innerHTML=`<div class="combined-box"><div class="section-title" style="margin-bottom:.75rem;">All jobs combined</div>${alerts}</div>`;
-  } else {ce.innerHTML="";}
+    ce.innerHTML=`<div class="combined-box"><div class="section-title" style="margin-bottom:.75rem;">Jobs in the next 45 days (${upcoming.length})</div>${alerts}</div>`;
+  } else {ce.innerHTML='<div class="combined-box">No jobs in the next 45 days.</div>';}
 }
 
 function renderInventoryTables(){
@@ -887,8 +894,10 @@ async function updateChip(name,val){
 function renderOrderGuide(){
   const el=document.getElementById("order-content");
   let orderItems=[];
+  const upcoming=orderWindowJobs();
+  const windowNote=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">Ordering for jobs in the next 45 days (${upcoming.length}). ${jobs.length-upcoming.length} later job${jobs.length-upcoming.length===1?"":"s"} excluded.</div>`;
   const sqftByAnchorB={};let totalAnchorASqft=0,totalTCSqft=0;
-  jobs.forEach(j=>{
+  upcoming.forEach(j=>{
     if(j.jobType!=="outdoor"){totalAnchorASqft+=j.sqft;if(j.anchorBSku)sqftByAnchorB[j.anchorBSku]=(sqftByAnchorB[j.anchorBSku]||0)+j.sqft;}
     totalTCSqft+=j.sqft;
   });
@@ -906,16 +915,16 @@ function renderOrderGuide(){
     orderItems.push({name:"Top Coat A + B (pair)",toOrder,unit:"pairs",price:(PRICES["Top Coat A"]+PRICES["Top Coat B"])*toOrder,sqftNote:totalTCSqft.toLocaleString()+" sq ft scheduled"});
   }
   const chipTotals={};
-  jobs.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
+  upcoming.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
   const chipOrders=[];
   Object.entries(chipTotals).forEach(([color,need])=>{
     const have=getChipQty(color);
     if(need>have)chipOrders.push({color,need,have,short:Math.ceil(need-have)});
   });
-  if(!orderItems.length&&!chipOrders.length){el.innerHTML='<div class="alert ok">Nothing to order &mdash; all backstock levels are good.</div>'+shippingNote(0);return;}
-  const totalSqft=jobs.reduce((s,j)=>s+j.sqft,0);
-  let subtotal=0,html="";
-  if(totalSqft>0)html+=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">${jobs.length} job${jobs.length>1?"s":""} scheduled &middot; <span style="color:var(--gf-text);">${totalSqft.toLocaleString()} total sq ft</span></div>`;
+  if(!orderItems.length&&!chipOrders.length){el.innerHTML=windowNote+'<div class="alert ok">Nothing to order for the next 45 days &mdash; backstock levels are good.</div>'+shippingNote(0);return;}
+  const totalSqft=upcoming.reduce((s,j)=>s+j.sqft,0);
+  let subtotal=0,html=windowNote;
+  if(totalSqft>0)html+=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">${upcoming.length} job${upcoming.length>1?"s":""} in window &middot; <span style="color:var(--gf-text);">${totalSqft.toLocaleString()} total sq ft</span></div>`;
   if(orderItems.length){
     html+='<div class="section-title" style="margin-bottom:.5rem;">Coatings to order</div><div class="order-summary">';
     orderItems.forEach(item=>{

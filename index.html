@@ -598,7 +598,7 @@ async function addJob(){
   }
   const ov=parseInt(document.getElementById("chip-override").value);
   const chipOverride=(jobType==="double"&&ov>0)?ov:null;
-  if (!(await ensureEditorAccess())) return;
+  const editorToken = await ensureEditorAccess(); if (!editorToken) return;
   jobs.push({name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate});
   jobs.sort((a,b)=>a.installDate<b.installDate?-1:a.installDate>b.installDate?1:0);
   document.getElementById("job-name").value="";
@@ -617,24 +617,24 @@ async function addJob(){
   document.getElementById("double-override-row").style.display="none";
   document.getElementById("chip-override").value="";
   document.getElementById("chip-suggestion").textContent="—";
-  renderJobs();persistJobs();
+  renderJobs();persistJobs(editorToken);
 }
 
 async function removeJob(i){
-  if (!(await ensureEditorAccess())) return;
-  jobs.splice(i,1);renderJobs();persistJobs();
+  const editorToken = await ensureEditorAccess(); if (!editorToken) return;
+  jobs.splice(i,1);renderJobs();persistJobs(editorToken);
 }
 async function clearJobs(){
   if(!jobs.length)return;
   if(!confirm("Clear all jobs?"))return;
-  if (!(await ensureEditorAccess())) return;
-  jobs=[];renderJobs();persistJobs();
+  const editorToken = await ensureEditorAccess(); if (!editorToken) return;
+  jobs=[];renderJobs();persistJobs(editorToken);
 }
 
-async function persistJobs(){
+async function persistJobs(editorToken){
   setSyncStatus("syncing","Saving...");
   try {
-    await postEditorAction("saveJobs", { jobs: jobs, allowEmpty: jobs.length === 0 });
+    await postJson({ action: "saveJobs", jobs: jobs, allowEmpty: jobs.length === 0, editorToken });
     setSyncStatus("ok","Saved");
   } catch (error) {
     if (error.message !== "Editing cancelled") {
@@ -733,10 +733,10 @@ async function saveEditJob(i){
   }
   const ov=parseInt(document.getElementById("ej-override-"+i)?.value||"");
   const chipOverride=(jobType==="double"&&ov>0)?ov:null;
-  if (!(await ensureEditorAccess())) return;
+  const editorToken = await ensureEditorAccess(); if (!editorToken) return;
   jobs[i]={name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate};
   jobs.sort((a,b)=>a.installDate<b.installDate?-1:a.installDate>b.installDate?1:0);
-  renderJobs();persistJobs();
+  renderJobs();persistJobs(editorToken);
 }
 
 function jtBadge(jt){

@@ -397,15 +397,8 @@ async function postJson(payload) {
 }
 
 async function ensureEditorAccess() {
-  let token = localStorage.getItem(EDITOR_TOKEN_KEY) || "";
-  if (token) {
-    try {
-      const result = await postJson({ action: "authorizeEditor", editorToken: token });
-      if (result.authorized) return token;
-    } catch (_) {
-      localStorage.removeItem(EDITOR_TOKEN_KEY);
-    }
-  }
+  const token = localStorage.getItem(EDITOR_TOKEN_KEY) || "";
+  if (token) return token; // The server validates this token on every write.
 
   const pin = prompt("Enter the editor PIN to change inventory or jobs:");
   if (pin === null) return null;

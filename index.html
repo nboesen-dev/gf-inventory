@@ -630,10 +630,21 @@ async function persistJobs(editorToken){
     await postJson({ action: "saveJobs", jobs: jobs, allowEmpty: jobs.length === 0, editorToken });
     setSyncStatus("ok","Saved");
   } catch (error) {
-    if (error.message !== "Editing cancelled") {
-      setSyncStatus("error","Save failed");
-      alert("The job change was not saved. Refresh before making another change.");
-    }
+    // Apps Script sometimes saves successfully even when its response fails.
+    // Read the server state before reporting that a job change was lost.
+    try {
+      const response = await fetch(GAS_URL + "?action=getInventory");
+      const server = await response.json();
+      const fields = ["name","sqft","chipColor","jobType","anchorBSku","tint","chipOverride","installDate"];
+      const signature = list => JSON.stringify(list.map(job =>
+        fields.map(field => String(job[field] ?? ""))));
+      if (Array.isArray(server.jobs) && signature(server.jobs) === signature(jobs)) {
+        setSyncStatus("ok","Saved");
+        return;
+      }
+    } catch (_) {}
+    setSyncStatus("error","Save failed");
+    alert("The job change could not be verified. Refresh before making another change.");
   }
 }
 

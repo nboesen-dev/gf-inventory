@@ -499,7 +499,7 @@ function jobMaterials(job){
 function orderWindowJobs(){
   const today=new Date();
   const start=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-  const end=new Date(start);end.setDate(end.getDate()+45);
+  const end=new Date(start);end.setDate(end.getDate()+30);
   return jobs.filter(j=>{const d=new Date(j.installDate+"T12:00:00");return d>=start&&d<=end;});
 }
 function projectedRemaining(sku,selectedJobs=orderWindowJobs()){
@@ -791,7 +791,7 @@ function renderJobs(){
     html+=`<div class="result-card ${hasIssues?"has-issues":"all-good"}" id="job-card-${i}">
       <div class="result-header">
         <div>
-          <div class="result-date">${formatDate(job.installDate)}${inWindow?"":' · Outside 45-day order window'}</div>
+          <div class="result-date">${formatDate(job.installDate)}${inWindow?"":' · Outside 30-day order window'}</div>
           <div class="result-name">${job.name} ${jtBadge(job.jobType)}</div>
           <div class="result-meta">${job.sqft.toLocaleString()} sq ft &middot; ${job.chipColor}${job.jobType!=="outdoor"?" &middot; Anchor B - "+abLabel:""}</div>
         </div>
@@ -830,8 +830,8 @@ function renderJobs(){
       const have=getChipQty(color),short=Math.max(0,need-have);
       alerts+=`<div class="alert ${short>0?"danger":"ok"}">${color} chips: need ${need}, have ${have} &mdash; ${short>0?"order "+short+" more":"covered"}</div>`;
     });
-    ce.innerHTML=`<div class="combined-box"><div class="section-title" style="margin-bottom:.75rem;">Jobs in the next 45 days (${upcoming.length})</div>${alerts}</div>`;
-  } else {ce.innerHTML='<div class="combined-box">No jobs in the next 45 days.</div>';}
+    ce.innerHTML=`<div class="combined-box"><div class="section-title" style="margin-bottom:.75rem;">Jobs in the next 30 days (${upcoming.length})</div>${alerts}</div>`;
+  } else {ce.innerHTML='<div class="combined-box">No jobs in the next 30 days.</div>';}
 }
 
 function renderInventoryTables(){
@@ -895,7 +895,7 @@ function renderOrderGuide(){
   const el=document.getElementById("order-content");
   let orderItems=[];
   const upcoming=orderWindowJobs();
-  const windowNote=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">Ordering for jobs in the next 45 days (${upcoming.length}). ${jobs.length-upcoming.length} later job${jobs.length-upcoming.length===1?"":"s"} excluded.</div>`;
+  const windowNote=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">Ordering for jobs in the next 30 days (${upcoming.length}). ${jobs.length-upcoming.length} later job${jobs.length-upcoming.length===1?"":"s"} excluded.</div>`;
   const sqftByAnchorB={};let totalAnchorASqft=0,totalTCSqft=0;
   upcoming.forEach(j=>{
     if(j.jobType!=="outdoor"){totalAnchorASqft+=j.sqft;if(j.anchorBSku)sqftByAnchorB[j.anchorBSku]=(sqftByAnchorB[j.anchorBSku]||0)+j.sqft;}
@@ -921,7 +921,7 @@ function renderOrderGuide(){
     const have=getChipQty(color);
     if(need>have)chipOrders.push({color,need,have,short:Math.ceil(need-have)});
   });
-  if(!orderItems.length&&!chipOrders.length){el.innerHTML=windowNote+'<div class="alert ok">Nothing to order for the next 45 days &mdash; backstock levels are good.</div>'+shippingNote(0);return;}
+  if(!orderItems.length&&!chipOrders.length){el.innerHTML=windowNote+'<div class="alert ok">Nothing to order for the next 30 days &mdash; backstock levels are good.</div>'+shippingNote(0);return;}
   const totalSqft=upcoming.reduce((s,j)=>s+j.sqft,0);
   let subtotal=0,html=windowNote;
   if(totalSqft>0)html+=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">${upcoming.length} job${upcoming.length>1?"s":""} in window &middot; <span style="color:var(--gf-text);">${totalSqft.toLocaleString()} total sq ft</span></div>`;
@@ -935,7 +935,7 @@ function renderOrderGuide(){
   }
   html+=shippingNote(subtotal);
   if(chipOrders.length){
-    html+='<div class="section-title" style="margin-top:1.5rem;margin-bottom:.5rem;">Chips to order (next 45 days)</div><div class="order-summary">';
+    html+='<div class="section-title" style="margin-top:1.5rem;margin-bottom:.5rem;">Chips to order (next 30 days)</div><div class="order-summary">';
     chipOrders.forEach(c=>{html+=`<div class="order-row"><span>${c.color} chips</span><span>order ${c.short} more (have ${c.have}, need ${c.need})</span></div>`;});
     html+="</div>";
   }

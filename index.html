@@ -397,21 +397,8 @@ async function postJson(payload) {
 }
 
 async function ensureEditorAccess() {
-  const token = localStorage.getItem(EDITOR_TOKEN_KEY) || "";
-  if (token) return token; // The server validates this token on every write.
-
-  const pin = prompt("Enter the editor PIN to change inventory or jobs:");
-  if (pin === null) return null;
-
-  try {
-    const result = await postJson({ action: "authorizeEditor", pin: pin.trim() });
-    if (!result.editorToken) throw new Error("Authorization failed");
-    localStorage.setItem(EDITOR_TOKEN_KEY, result.editorToken);
-    return result.editorToken;
-  } catch (error) {
-    alert(error.message === "Invalid PIN" ? "Incorrect PIN." : "Could not authorize editing.");
-    return null;
-  }
+  // The deployed Apps Script accepts edits without a PIN.
+  return true;
 }
 
 async function postEditorAction(action, payload) {

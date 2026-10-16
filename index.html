@@ -222,6 +222,7 @@ select option { background: var(--gf-card2); }
               <option value="standard">Standard (indoor)</option>
               <option value="outdoor">Outdoor / UV</option>
               <option value="double">Double broadcast</option>
+              <option value="cyclo">Grind &amp; Seal — Cyclo-1</option>
             </select>
           </div>
         </div>
@@ -268,6 +269,7 @@ select option { background: var(--gf-card2); }
           </div>
         </div>
         <div id="anchor-note"></div>
+        <div id="seal-options" style="display:none" class="form-group"><label>Cyclo-1 coats</label><select id="seal-coats"><option value="1">1 coat</option><option value="2">2 coats</option></select><p class="hint">400 sq ft/gallon per coat · 2-gallon kit · $275. No chips or anchor coat.</p></div>
         <div id="double-override-row" style="display:none; margin-bottom:12px; margin-top:4px;">
           <div class="form-group">
             <label>Chip boxes &mdash; suggested: <span id="chip-suggestion" style="color:var(--gf-green);">—</span> <span style="color:var(--gf-muted);font-weight:400;">(override if needed)</span></label>
@@ -317,6 +319,7 @@ select option { background: var(--gf-card2); }
             <option value="standard">Standard (indoor)</option>
             <option value="outdoor">Outdoor / UV</option>
             <option value="double">Double broadcast</option>
+              <option value="cyclo">Grind &amp; Seal — Cyclo-1</option>
           </select>
         </div>
       </div>
@@ -376,6 +379,7 @@ select option { background: var(--gf-card2); }
           <input type="number" id="est-overhead" value="100" min="0" oninput="runEstimator()" style="width:100%;" />
         </div>
       </div>
+      <div id="est-seal-options" style="display:none"><label>Cyclo-1 coats</label><select id="est-seal-coats" onchange="runEstimator()"><option value="1">1 coat</option><option value="2">2 coats</option></select><label style="margin-top:10px">Estimated hours per worker (grind &amp; seal)</label><input id="est-seal-hours" type="number" min="0.25" step="0.25" placeholder="Enter planned hours" oninput="runEstimator()" /><p class="hint">400 sq ft/gallon per coat · $275 per 2-gallon kit. Enter labor hours for this job.</p></div>
       <div id="est-outdoor-note" style="display:none;" class="alert info">Top coat used as anchor coat — no Anchor A or B consumed.</div>
     </div>
     <div id="est-result"></div>
@@ -449,6 +453,8 @@ const BRIDGE=["Baskerville","Bethpage","Copperplate","Pinehurst","Port Rush","Tr
 const HYBRID=["Agate","Blue Granite","Denali","Limestone","Phoenix","Santa Fe"];
 function getSeries(n){if(STONE.includes(n))return"Stone";if(BRIDGE.includes(n))return"Stonebridge";if(HYBRID.includes(n))return"Hybrid";return"Standard";}
 
+const CYCLO_SKU="Cyclo-1", CYCLO_KIT_GALLONS=2, CYCLO_SQFT_PER_GALLON=400, CYCLO_KIT_PRICE=275;
+let cycloBackendReady=false;
 let inventory={coatings:[],chips:[]},jobs=[];
 
 function getCoatingQty(n){const c=inventory.coatings.find(x=>x.name===n);return c?c.qty:0;}
@@ -464,6 +470,8 @@ function loadData(){
     .then(r => r.json())
     .then(d => {
       inventory.coatings=d.coatings;inventory.chips=d.chips;jobs=d.jobs;
+      cycloBackendReady=Array.isArray(d.supportedJobTypes)&&d.supportedJobTypes.includes("cyclo");
+      document.querySelectorAll('#job-type option[value="cyclo"]').forEach(o=>{o.disabled=!cycloBackendReady;o.textContent=cycloBackendReady?"Grind & Seal — Cyclo-1":"Grind & Seal — Cyclo-1 (script update needed)";});
       setSyncStatus("ok","Synced");
       document.getElementById("planner-loading").style.display="none";
       document.getElementById("planner-content").style.display="block";
@@ -476,11 +484,12 @@ function loadData(){
 
 function jobMaterials(job){
   const{sqft,jobType,chipOverride}=job;
-  let aA=0,aB=0,tc=0,ch=0;
+  let aA=0,aB=0,tc=0,ch=0,cyclo=0;
   if(jobType==="standard"){aA=sqft/ANCHOR_A_SQFT;aB=sqft/ANCHOR_B_SQFT;tc=sqft/TOPCOAT_STANDARD_SQFT_PER_PAIR;ch=standardChipBoxes(sqft);}
   else if(jobType==="outdoor"){tc=sqft/OUTDOOR_ANCHOR_SQFT_PER_BUCKET+sqft/TOPCOAT_STANDARD_SQFT_PER_PAIR;ch=standardChipBoxes(sqft);}
   else if(jobType==="double"){aA=sqft/ANCHOR_A_SQFT;aB=sqft/ANCHOR_B_SQFT;tc=sqft/TOPCOAT_STANDARD_SQFT_PER_PAIR+sqft/TOPCOAT_DOUBLE_FINAL_SQFT_PER_PAIR;ch=chipOverride||doubleChipBoxes(sqft);}
-  return{aA,aB,tc,ch};
+  if(jobType==="cyclo")cyclo=sqft*(job.sealCoats||1)/(CYCLO_SQFT_PER_GALLON*CYCLO_KIT_GALLONS);
+  return{aA,aB,tc,ch,cyclo};
 }
 
 function orderWindowJobs(){
@@ -493,7 +502,8 @@ function projectedRemaining(sku,selectedJobs=orderWindowJobs()){
   let used=0;
   selectedJobs.forEach(job=>{
     const m=jobMaterials(job);
-    if(sku==="Anchor Coat A")used+=m.aA;
+    if(sku===CYCLO_SKU)used+=m.cyclo;
+    else if(sku==="Anchor Coat A")used+=m.aA;
     else if(sku===job.anchorBSku)used+=m.aB;
     else if(sku==="Top Coat A"||sku==="Top Coat B")used+=m.tc;
   });
@@ -508,9 +518,12 @@ function updateChipSuggestion(){
 
 function onJobTypeChange(){
   const jt=document.getElementById("job-type").value;
-  document.getElementById("anchor-b-select").closest(".form-group").parentElement.style.display=jt==="outdoor"?"none":"grid";
+  document.getElementById("anchor-b-select").closest(".form-group").parentElement.style.display=(jt==="outdoor"||jt==="cyclo")?"none":"grid";
   document.getElementById("outdoor-note").style.display=jt==="outdoor"?"block":"none";
   document.getElementById("double-override-row").style.display=jt==="double"?"block":"none";
+  document.getElementById("chip-color").closest(".form-group").style.display=jt==="cyclo"?"none":"";
+  document.getElementById("seal-options").style.display=jt==="cyclo"?"block":"none";
+  document.getElementById("anchor-note").style.display=jt==="cyclo"?"none":"";
   if(jt==="double")updateChipSuggestion();
 }
 
@@ -565,7 +578,7 @@ function buildAnchorBOptions(chipName, selectedRaw){
 async function addJob(){
   const name=document.getElementById("job-name").value.trim();
   const sqft=parseFloat(document.getElementById("sqft").value);
-  const chipColor=document.getElementById("chip-color").value;
+  const chipColor=document.getElementById("job-type").value==="cyclo"?"":document.getElementById("chip-color").value;
   const jobType=document.getElementById("job-type").value;
   const mm=document.getElementById("date-month").value.trim();
   const dd=document.getElementById("date-day").value.trim();
@@ -573,9 +586,9 @@ async function addJob(){
   if(!mm||!dd||!yy){alert("Fill in all fields including install date.");return;}
   const fullYear=parseInt(yy)<100?(2000+parseInt(yy)):parseInt(yy);
   const installDate=`${fullYear}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`;
-  if(!name||!sqft||!chipColor){alert("Fill in all fields.");return;}
+  if(!name||!(sqft>0)||(jobType!=="cyclo"&&!chipColor)){alert("Fill in all fields.");return;}
   let anchorBSku=null,tint=null;
-  if(jobType!=="outdoor"){
+  if(jobType!=="outdoor"&&jobType!=="cyclo"){
     const raw=document.getElementById("anchor-b-select").value;
     if(!raw){alert("Select an Anchor B color.");return;}
     const p=parseOpt(raw);anchorBSku=p.sku;tint=p.tint;
@@ -585,7 +598,9 @@ async function addJob(){
   const ov=parseInt(document.getElementById("chip-override").value);
   const chipOverride=(jobType==="double"&&ov>0)?ov:null;
   const editorToken = await ensureEditorAccess(); if (!editorToken) return;
-  jobs.push({name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate});
+  if(jobType==="cyclo"&&!cycloBackendReady){alert("Update the Apps Script deployment before saving Cyclo-1 jobs.");return;}
+  const sealCoats=jobType==="cyclo"?Number(document.getElementById("seal-coats").value):null;
+  jobs.push({name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate,sealCoats});
   jobs.sort((a,b)=>a.installDate<b.installDate?-1:a.installDate>b.installDate?1:0);
   document.getElementById("job-name").value="";
   document.getElementById("sqft").value="";
@@ -603,6 +618,7 @@ async function addJob(){
   document.getElementById("double-override-row").style.display="none";
   document.getElementById("chip-override").value="";
   document.getElementById("chip-suggestion").textContent="—";
+  onJobTypeChange();
   renderJobs();persistJobs(editorToken);
 }
 
@@ -628,7 +644,7 @@ async function persistJobs(editorToken){
     try {
       const response = await fetch(GAS_URL + "?action=getInventory");
       const server = await response.json();
-      const fields = ["name","sqft","chipColor","jobType","anchorBSku","tint","chipOverride","installDate"];
+      const fields = ["name","sqft","chipColor","jobType","anchorBSku","tint","chipOverride","installDate","sealCoats"];
       const signature = list => JSON.stringify(list.map(job =>
         fields.map(field => String(job[field] ?? ""))));
       if (Array.isArray(server.jobs) && signature(server.jobs) === signature(jobs)) {
@@ -653,9 +669,9 @@ function startEditJob(i){
   const card=document.getElementById("job-card-"+i);
   const[y,m,d]=job.installDate.split("-");
   const entry=CHIP_MASTER[job.chipColor]||{};
-  const isOutdoor=job.jobType==="outdoor";
+  const isOutdoor=job.jobType==="outdoor",isSeal=job.jobType==="cyclo";
   const anchorBRaw=job.anchorBSku+(job.tint?"|"+job.tint:"|");
-  const jts=["standard","outdoor","double"].map(t=>`<option value="${t}"${t===job.jobType?" selected":""}>${t==="standard"?"Standard (indoor)":t==="outdoor"?"Outdoor / UV":"Double broadcast"}</option>`).join("");
+  const jts=["standard","outdoor","double",...(cycloBackendReady?["cyclo"]:[])].map(t=>`<option value="${t}"${t===job.jobType?" selected":""}>${t==="standard"?"Standard (indoor)":t==="outdoor"?"Outdoor / UV":t==="cyclo"?"Grind & Seal — Cyclo-1":"Double broadcast"}</option>`).join("");
   card.innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div class="fg"><label>Job name</label><input id="ej-name-${i}" value="${job.name}"/></div>
@@ -672,12 +688,13 @@ function startEditJob(i){
       <div class="fg"><label>Job type</label><select id="ej-jt-${i}" onchange="onEditJobTypeChange(${i})">${jts}</select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div class="fg"><label>Chip color</label><select id="ej-chip-${i}" onchange="onEditChipChange(${i})">${buildChipOptions(job.chipColor)}</select></div>
-      <div class="fg" id="ej-anchor-group-${i}" style="${isOutdoor?"display:none":""}">
+      <div class="fg" id="ej-chip-group-${i}" style="${isSeal?"display:none":""}"><label>Chip color</label><select id="ej-chip-${i}" onchange="onEditChipChange(${i})">${buildChipOptions(job.chipColor)}</select></div>
+      <div class="fg" id="ej-anchor-group-${i}" style="${isOutdoor||isSeal?"display:none":""}">
         <label id="ej-anchor-lbl-${i}">Anchor B</label>
         <select id="ej-anchor-${i}">${buildAnchorBOptions(job.chipColor,anchorBRaw)}</select>
       </div>
     </div>
+    <div id="ej-seal-options-${i}" style="${isSeal?"":"display:none"}"><label>Cyclo-1 coats</label><select id="ej-seal-coats-${i}"><option value="1" ${(job.sealCoats||1)===1?"selected":""}>1 coat</option><option value="2" ${job.sealCoats===2?"selected":""}>2 coats</option></select></div>
     <div id="ej-outdoor-note-${i}" class="alert info" style="${isOutdoor?"":"display:none"}">Top coat used as anchor coat.</div>
     <div id="ej-double-row-${i}" style="${job.jobType==="double"?"":"display:none"};margin-bottom:10px;">
       <div class="fg"><label>Chip boxes override (suggested: ${doubleChipBoxes(job.sqft)})</label>
@@ -693,9 +710,11 @@ function startEditJob(i){
 
 function onEditJobTypeChange(i){
   const jt=document.getElementById("ej-jt-"+i).value;
-  document.getElementById("ej-anchor-group-"+i).style.display=jt==="outdoor"?"none":"";
+  document.getElementById("ej-anchor-group-"+i).style.display=(jt==="outdoor"||jt==="cyclo")?"none":"";
   document.getElementById("ej-outdoor-note-"+i).style.display=jt==="outdoor"?"block":"none";
   document.getElementById("ej-double-row-"+i).style.display=jt==="double"?"block":"none";
+  document.getElementById("ej-chip-group-"+i).style.display=jt==="cyclo"?"none":"";
+  document.getElementById("ej-seal-options-"+i).style.display=jt==="cyclo"?"block":"none";
 }
 
 function onEditChipChange(i){
@@ -716,12 +735,12 @@ async function saveEditJob(i){
   const sqft=parseFloat(document.getElementById("ej-sqft-"+i).value);
   const name=document.getElementById("ej-name-"+i).value.trim();
   const jobType=document.getElementById("ej-jt-"+i).value;
-  const chipColor=document.getElementById("ej-chip-"+i).value;
-  if(!name||!sqft||!mm||!dd||!yy||!chipColor){alert("Fill in all fields.");return;}
+  const chipColor=jobType==="cyclo"?"":document.getElementById("ej-chip-"+i).value;
+  if(!name||!(sqft>0)||!mm||!dd||!yy||(jobType!=="cyclo"&&!chipColor)){alert("Fill in all fields.");return;}
   const fullYear=parseInt(yy)<100?(2000+parseInt(yy)):parseInt(yy);
   const installDate=`${fullYear}-${String(mm).padStart(2,"0")}-${String(dd).padStart(2,"0")}`;
   let anchorBSku=null,tint=null;
-  if(jobType!=="outdoor"){
+  if(jobType!=="outdoor"&&jobType!=="cyclo"){
     const raw=document.getElementById("ej-anchor-"+i).value;
     if(!raw){alert("Select an Anchor B color.");return;}
     const p=parseOpt(raw);anchorBSku=p.sku;tint=p.tint;
@@ -731,12 +750,14 @@ async function saveEditJob(i){
   const ov=parseInt(document.getElementById("ej-override-"+i)?.value||"");
   const chipOverride=(jobType==="double"&&ov>0)?ov:null;
   const editorToken = await ensureEditorAccess(); if (!editorToken) return;
-  jobs[i]={name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate};
+  const sealCoats=jobType==="cyclo"?Number(document.getElementById("ej-seal-coats-"+i).value):null;
+  jobs[i]={name,sqft,chipColor,jobType,anchorBSku,tint,chipOverride,installDate,sealCoats};
   jobs.sort((a,b)=>a.installDate<b.installDate?-1:a.installDate>b.installDate?1:0);
   renderJobs();persistJobs(editorToken);
 }
 
 function jtBadge(jt){
+  if(jt==="cyclo")return '<span class="job-type-badge jt-standard">Grind &amp; Seal</span>';
   if(jt==="outdoor")return'<span class="job-type-badge jt-outdoor">Outdoor/UV</span>';
   if(jt==="double")return'<span class="job-type-badge jt-double">Double BC</span>';
   return'<span class="job-type-badge jt-standard">Standard</span>';
@@ -757,6 +778,11 @@ function renderJobs(){
   jobs.forEach((job,i)=>{
     const inWindow=upcoming.includes(job);
     const m=jobMaterials(job);
+    if(job.jobType==="cyclo"){
+      const rem=projectedRemaining(CYCLO_SKU), gallons=m.cyclo*CYCLO_KIT_GALLONS;
+      html+=`<div class="result-card ${inWindow&&rem<0?"has-issues":"all-good"}" id="job-card-${i}"><div class="result-header"><div><div class="result-date">${formatDate(job.installDate)}${inWindow?"":" · Outside 30-day order window"}</div><div class="result-name">${job.name} ${jtBadge(job.jobType)}</div><div class="result-meta">${job.sqft.toLocaleString()} sq ft · Cyclo-1 · ${job.sealCoats||1} coat(s)</div></div><button class="btn btn-secondary" onclick="startEditJob(${i})">Edit</button></div><div class="result-item"><div class="result-item-label">Cyclo-1</div><div class="result-item-val">${gallons.toFixed(2)} gallons · ${m.cyclo.toFixed(2)} kits</div><div class="hint">400 sq ft/gallon per coat · 2-gallon kits · no chips or anchor</div><div>${inWindow?`${sb(rem,0)} ${rem.toFixed(2)} kits left after window jobs`:"Outside order window"}</div></div></div>`;
+      return;
+    }
     const chHave=getChipQty(job.chipColor),chShort=Math.max(0,m.ch-chHave);
     const abLabel=job.anchorBSku?(job.anchorBSku.replace("Anchor Coat B - ","")+(job.tint?" + "+job.tint:"")):"—";
     const tintNote=job.tint?`<div class="hint">Add ${job.tint} tint</div>`:"";
@@ -803,16 +829,17 @@ function renderJobs(){
   });
   el.innerHTML=html;
   if(upcoming.length){
-    const usedSkus=new Set(["Anchor Coat A",...upcoming.filter(j=>j.anchorBSku).map(j=>j.anchorBSku)]);
+    const usedSkus=new Set([...(upcoming.some(j=>jobMaterials(j).aA>0)?["Anchor Coat A"]:[]),...upcoming.filter(j=>j.anchorBSku).map(j=>j.anchorBSku)]);
     let alerts="";
     ["Anchor Coat A","Anchor Coat B - Grey","Anchor Coat B - Tan","Anchor Coat B - Clear"].filter(s=>usedSkus.has(s)).forEach(sku=>{
       const rem=projectedRemaining(sku),min=MIN_BACKSTOCK[sku]||0,ok=rem>=min;
       alerts+=`<div class="alert ${ok?"ok":"danger"}">${sku.replace("Anchor Coat ","")}: ${rem.toFixed(2)} remaining after window jobs &mdash; ${ok?"backstock OK":"order now"}</div>`;
     });
     const tcRem=projectedTC();
-    alerts+=`<div class="alert ${tcRem>=1?"ok":"danger"}">Top coat pairs: ${tcRem.toFixed(2)} remaining &mdash; ${tcRem>=1?"backstock OK":"order now"}</div>`;
+    if(upcoming.some(j=>jobMaterials(j).tc>0))alerts+=`<div class="alert ${tcRem>=1?"ok":"danger"}">Top coat pairs: ${tcRem.toFixed(2)} remaining &mdash; ${tcRem>=1?"backstock OK":"order now"}</div>`;
+    if(upcoming.some(j=>j.jobType==="cyclo")){const rem=projectedRemaining(CYCLO_SKU);alerts+=`<div class="alert ${rem>=0?"ok":"danger"}">Cyclo-1: ${rem.toFixed(2)} kits remaining — ${rem>=0?"covered":"order "+Math.ceil(-rem)+" kits"}</div>`;}
     const chipTotals={};
-    upcoming.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
+    upcoming.filter(j=>j.jobType!=="cyclo").forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
     Object.entries(chipTotals).forEach(([color,need])=>{
       const have=getChipQty(color),short=Math.max(0,need-have);
       alerts+=`<div class="alert ${short>0?"danger":"ok"}">${color} chips: need ${need}, have ${have} &mdash; ${short>0?"order "+short+" more":"covered"}</div>`;
@@ -829,7 +856,7 @@ function renderInventoryTables(){
     const lbl=item.qty===0?"Out":item.qty<=min?"Low":"OK";
     const isTC=item.name==="Top Coat A"||item.name==="Top Coat B";
     const hint=isTC?`<div class="hint">Pairs available: ${getTopcoatPairs()}</div>`:"";
-    html+=`<tr><td>${item.name}${hint}</td><td>${item.qty} buckets</td><td><span class="badge ${cls}">${lbl}</span></td>
+    html+=`<tr><td>${item.name}${hint}</td><td>${item.qty} ${item.name===CYCLO_SKU?"kits (2 gal)":"buckets"}</td><td><span class="badge ${cls}">${lbl}</span></td>
       <td><input class="edit-qty" type="number" min="0" step="0.5" value="${item.qty}" onchange="updateCoating('${item.name}',this.value)"/></td></tr>`;
   });
   html+="</tbody>";
@@ -885,8 +912,8 @@ function renderOrderGuide(){
   const windowNote=`<div style="margin-bottom:1rem;font-size:13px;color:var(--gf-muted);">Ordering for jobs in the next 30 days (${upcoming.length}). ${jobs.length-upcoming.length} later job${jobs.length-upcoming.length===1?"":"s"} excluded.</div>`;
   const sqftByAnchorB={};let totalAnchorASqft=0,totalTCSqft=0;
   upcoming.forEach(j=>{
-    if(j.jobType!=="outdoor"){totalAnchorASqft+=j.sqft;if(j.anchorBSku)sqftByAnchorB[j.anchorBSku]=(sqftByAnchorB[j.anchorBSku]||0)+j.sqft;}
-    totalTCSqft+=j.sqft;
+    if(j.jobType!=="outdoor"&&j.jobType!=="cyclo"){totalAnchorASqft+=j.sqft;if(j.anchorBSku)sqftByAnchorB[j.anchorBSku]=(sqftByAnchorB[j.anchorBSku]||0)+j.sqft;}
+    if(j.jobType!=="cyclo")totalTCSqft+=j.sqft;
   });
   ["Anchor Coat A","Anchor Coat B - Grey","Anchor Coat B - Tan","Anchor Coat B - Clear"].forEach(sku=>{
     const rem=projectedRemaining(sku),min=MIN_BACKSTOCK[sku]||0;
@@ -896,13 +923,15 @@ function renderOrderGuide(){
       orderItems.push({name:sku,toOrder,unit:"buckets",price:(PRICES[sku]||0)*toOrder,sqftNote:sqft.toLocaleString()+" sq ft scheduled"});
     }
   });
+  const cycloRem=projectedRemaining(CYCLO_SKU);
+  if(cycloRem<0){const toOrder=Math.ceil(-cycloRem);orderItems.push({name:CYCLO_SKU,toOrder,unit:"2-gallon kits",price:toOrder*CYCLO_KIT_PRICE,sqftNote:"400 sq ft/gallon per coat"});}
   const tcRem=projectedTC();
-  if(tcRem<1){
+  if(totalTCSqft>0&&tcRem<1){
     const toOrder=Math.ceil(1-tcRem);
     orderItems.push({name:"Top Coat A + B (pair)",toOrder,unit:"pairs",price:(PRICES["Top Coat A"]+PRICES["Top Coat B"])*toOrder,sqftNote:totalTCSqft.toLocaleString()+" sq ft scheduled"});
   }
   const chipTotals={};
-  upcoming.forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
+  upcoming.filter(j=>j.jobType!=="cyclo").forEach(j=>{chipTotals[j.chipColor]=(chipTotals[j.chipColor]||0)+jobMaterials(j).ch;});
   const chipOrders=[];
   Object.entries(chipTotals).forEach(([color,need])=>{
     const have=getChipQty(color);
@@ -975,7 +1004,9 @@ function calcJobCost(job) {
   const chipRate = getChipCostPerSqft(chipColor);
   let matCost = 0, laborCost = 0;
   laborCost = COST_LABOR_HRS_PER_SQFT * sqft * COST_LABOR_RATE;
-  if (jobType === "standard") {
+  if (jobType === "cyclo") {
+    matCost = jobMaterials(job).cyclo * CYCLO_KIT_PRICE;
+  } else if (jobType === "standard") {
     matCost = (COST_ANCHOR_A_PER_SQFT + COST_ANCHOR_B_PER_SQFT + COST_TC_PER_SQFT + chipRate) * sqft;
   } else if (jobType === "outdoor") {
     // TC used as anchor + finish; no anchor A or B
@@ -1003,10 +1034,12 @@ function calcJobCostCustom(job, laborRate, overhead, crewSize) {
   const { sqft, jobType, chipColor } = job;
   const chipRate = getChipCostPerSqft(chipColor);
   let matCost = 0;
-  const laborHrsPerWorker = Math.max(4.5, 2.882 + 0.003852 * sqft);
+  const laborHrsPerWorker = jobType==="cyclo"?Number(job.laborHours):Math.max(4.5, 2.882 + 0.003852 * sqft);
   const laborHrs = laborHrsPerWorker * crewSize;
   const laborCost = laborHrs * laborRate;
-  if (jobType === "standard") {
+  if (jobType === "cyclo") {
+    matCost = jobMaterials(job).cyclo * CYCLO_KIT_PRICE;
+  } else if (jobType === "standard") {
     matCost = (COST_ANCHOR_A_PER_SQFT + COST_ANCHOR_B_PER_SQFT + COST_TC_PER_SQFT + chipRate) * sqft;
   } else if (jobType === "outdoor") {
     const tcCost = ((sqft / 1733) + (sqft / 1500)) * 1200;
@@ -1023,6 +1056,8 @@ function calcJobCostCustom(job, laborRate, overhead, crewSize) {
 function onEstJobTypeChange() {
   const jt = document.getElementById("est-jobtype").value;
   document.getElementById("est-outdoor-note").style.display = jt === "outdoor" ? "block" : "none";
+  document.getElementById("est-chip").closest(".form-group").style.display=jt==="cyclo"?"none":"";
+  document.getElementById("est-seal-options").style.display=jt==="cyclo"?"block":"none";
   runEstimator();
 }
 
@@ -1035,8 +1070,11 @@ function runEstimator() {
   const overhead = parseFloat(document.getElementById("est-overhead").value) || 0;
   const crewSize = parseInt(document.getElementById("est-crew").value) || 3;
   const el = document.getElementById("est-result");
-  if (!sqft || sqft <= 0 || !chipColor) { el.innerHTML = ""; return; }
-  const job = { sqft, jobType, chipColor };
+  if (!sqft || sqft <= 0 || (jobType!=="cyclo"&&!chipColor)) { el.innerHTML = ""; return; }
+  const sealCoats=Number(document.getElementById("est-seal-coats").value);
+  const laborHours=Number(document.getElementById("est-seal-hours").value);
+  if(jobType==="cyclo"&&!(laborHours>0)){el.innerHTML='<p class="hint">Enter estimated hours per worker to calculate this grind &amp; seal job.</p>';return;}
+  const job = { sqft, jobType, chipColor, sealCoats, laborHours };
   const c = calcJobCostCustom(job, laborRate, overhead, crewSize);
   const hasSale = salePrice > 0;
   const margin = hasSale ? salePrice - c.total : null;
@@ -1046,13 +1084,13 @@ function runEstimator() {
   const isFloor = marginPct < 40 || grossProfit < 1200;
   const marginColor = marginPct === null ? "var(--gf-muted)" : isHealthy ? "var(--gf-green)" : isFloor ? "var(--gf-danger)" : "var(--gf-warn)";
   const chipSeries = STONEBRIDGE_SERIES.includes(chipColor) ? "Stonebridge" : STONE_SERIES.includes(chipColor) ? "Stone" : "Standard";
-  const hrsPerWorker = Math.max(4.5, 2.882 + 0.003852 * sqft).toFixed(1);
+  const hrsPerWorker = (jobType==="cyclo"?laborHours:Math.max(4.5, 2.882 + 0.003852 * sqft)).toFixed(1);
   const totalHrs = (parseFloat(hrsPerWorker) * crewSize).toFixed(1);
   el.innerHTML = `<div class="result-card all-good">
     <div class="result-header" style="margin-bottom:0.75rem;">
       <div>
         <div class="result-name">${sqft.toLocaleString()} sq ft ${jtBadge(jobType)}</div>
-        <div class="result-meta">${chipColor} &middot; ${chipSeries} series</div>
+        <div class="result-meta">${jobType==="cyclo"?`Cyclo-1 · ${sealCoats} coat(s) · ${(jobMaterials(job).cyclo*2).toFixed(2)} gallons · ${Math.ceil(jobMaterials(job).cyclo)} kits to have on hand`:chipColor+" &middot; "+chipSeries+" series"}</div>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
@@ -1064,7 +1102,7 @@ function runEstimator() {
         </div>
         <div class="result-item">
           <div class="result-item-label">Materials</div>
-          <div class="result-item-val">$${c.materials.toFixed(0)}</div>
+          <div class="result-item-val">$${c.materials.toFixed(0)}</div>${jobType==="cyclo"?`<div class="hint">Consumed product cost; full kits to buy: $${(Math.ceil(jobMaterials(job).cyclo)*CYCLO_KIT_PRICE).toFixed(0)}</div>`:""}
           <div class="hint">$${(c.materials/sqft).toFixed(2)}/sqft</div>
         </div>
         <div class="result-item">
@@ -1187,3 +1225,4 @@ applyMobileAfterRender();
 </script>
 </body>
 </html>
+

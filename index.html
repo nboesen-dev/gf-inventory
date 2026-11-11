@@ -959,7 +959,8 @@ function renderOrderGuide(){
     html+='<div class="section-title" style="margin-bottom:.5rem;">Coatings to order</div><div class="order-summary">';
     orderItems.forEach(item=>{
       subtotal+=item.price;
-      html+=`<div class="order-row"><span>${item.name} <span style="font-size:11px;color:var(--gf-muted)">(${item.toOrder} ${item.unit} &middot; ${item.sqftNote})</span></span><span style="color:var(--gf-green);font-weight:600;">$${item.price.toLocaleString()}</span></div>`;
+      const unitLabel=item.toOrder===1?item.unit.replace(/s$/,""):item.unit;
+      html+=`<div class="order-row"><span>${item.name} <span style="font-size:11px;color:var(--gf-muted)">(${item.toOrder} ${unitLabel} &middot; ${item.sqftNote})</span></span><span style="color:var(--gf-green);font-weight:600;">${item.price.toLocaleString()}</span></div>`;
     });
     html+=`<div class="order-row total"><span>Subtotal</span><span>$${subtotal.toLocaleString()}</span></div></div>`;
   }
@@ -979,7 +980,7 @@ function shippingNote(total){
   return `<div class="threshold-bar">
     <div class="threshold-row"><span class="threshold-label">Free shipping ($${FREE_SHIP.toLocaleString()})</span><span class="threshold-val ${ship?"hit":"miss"}">${ship?"Reached":"$"+toShip.toLocaleString()+" away"}</span></div>
     <div class="threshold-row" style="margin-top:4px;"><span class="threshold-label">Free liftgate ($${FREE_LIFTGATE.toLocaleString()})</span><span class="threshold-val ${lift?"hit":"miss"}">${lift?"Reached":"$"+toLift.toLocaleString()+" away"}</span></div>
-    ${!lift&&total>0?`<div class="hint" style="margin-top:8px;color:var(--gf-muted);">Add ${pairsToLift} top coat pair${pairsToLift>1?"s":""} ($${(pairsToLift*1200).toLocaleString()}) to hit free liftgate.</div>`:""}
+    ${!lift&&total>0?`<div class="hint" style="margin-top:8px;color:var(--gf-muted);">Optional shipping target: ${pairsToLift} extra top coat pair${pairsToLift>1?"s":""} (${(pairsToLift*1200).toLocaleString()}) would reach free liftgate.</div>`:""}
   </div>`;
 }
 
